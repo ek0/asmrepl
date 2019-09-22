@@ -1,0 +1,32 @@
+﻿{
+  "configurations": [
+    {
+      "name": "x64-Debug",
+      "generator": "Ninja",
+      "configurationType": "RelWithDebInfo",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-v",
+      "ctestCommandArgs": "",
+      "variables": [
+        {
+          "name": "ASMTK_STATIC",
+          "value": "True",
+          "type": "BOOL"
+        },
+        {
+          "name": "ASMJIT_BUILD_X86",
+          "value": "True",
+          "type": "BOOL"
+        },
+        {
+          "name": "ASMJIT_STATIC",
+          "value": "True",
+          "type": "BOOL"
+        }
+      ]
+    }
+  ]
+}
