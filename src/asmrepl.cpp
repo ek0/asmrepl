@@ -26,6 +26,7 @@ class AsmRepl
     bool print_xmm_;
 
     void PrintXmmRegisters(const CONTEXT*);
+    void PrintYmmRegisters(CONTEXT*);
     void PrintDebugRegisters(const CONTEXT*);
     void PrintEFlags(const CONTEXT*);
     void PrintSegmentRegisters(const CONTEXT*);
@@ -39,7 +40,7 @@ public:
     int Start();
     void Stop();
     void Wait();
-    void PrintContext(const CONTEXT* ctx);
+    void PrintContext(CONTEXT* ctx);
 };
 
 AsmRepl* asmrepl = nullptr;
@@ -124,7 +125,6 @@ void AsmRepl::PrintXmmRegisters(const CONTEXT* ctx)
     printf("xmm10=%016llx%016llx xmm11=%016llx%016llx\n", ctx->Xmm10.High, ctx->Xmm10.Low, ctx->Xmm11.High, ctx->Xmm11.Low);
     printf("xmm12=%016llx%016llx xmm13=%016llx%016llx\n", ctx->Xmm12.High, ctx->Xmm12.Low, ctx->Xmm13.High, ctx->Xmm13.Low);
     printf("xmm14=%016llx%016llx xmm15=%016llx%016llx\n", ctx->Xmm14.High, ctx->Xmm14.Low, ctx->Xmm15.High, ctx->Xmm15.Low);
-    printf("\nvec: %016llx%016llx\n", ctx->VectorRegister[0].High, ctx->VectorRegister[0].Low);
 }
 
 void AsmRepl::PrintDebugRegisters(const CONTEXT* ctx)
@@ -155,13 +155,21 @@ void AsmRepl::PrintSegmentRegisters(const CONTEXT* ctx)
                                                                 ctx->SegFs, ctx->SegGs, ctx->SegSs);
 }
 
-//void AsmRepl::PrintYmmRegisters(CONTEXT* ctx)
-//{
-//    PM128A ymm = (PM128A)LocateXStateFeature(ctx, XSTATE_AVX, 0);
-//    
-//}
+void AsmRepl::PrintYmmRegisters(CONTEXT* ctx)
+{
+    DWORD length = 0;
+    PM128A ymm = nullptr;
+    PM128A xmm = nullptr;
+    ymm = (PM128A)LocateXStateFeature(ctx, XSTATE_AVX, 0);
+    xmm = (PM128A)LocateXStateFeature(ctx, XSTATE_LEGACY_SSE, &length);
+    // TODO ADD CHECK
+    for(size_t i = 0; i < length / sizeof(M128A); ++i)
+    {
+        printf("ymm%01d=%016llx%016llx%016llx%016llx\n", i, ymm[i].High, ymm[i].Low, xmm[i].High, xmm[i].Low);
+    }
+}
 
-void AsmRepl::PrintContext(const CONTEXT* ctx)
+void AsmRepl::PrintContext(CONTEXT* ctx)
 {
     printf("rax=%016llx rbx=%016llx rcx=%016llx\n", ctx->Rax, ctx->Rbx, ctx->Rcx);
     printf("rdx=%016llx rsi=%016llx rdi=%016llx\n", ctx->Rdx, ctx->Rsi, ctx->Rdi);
@@ -173,6 +181,7 @@ void AsmRepl::PrintContext(const CONTEXT* ctx)
     PrintSegmentRegisters(ctx);
     PrintDebugRegisters(ctx);
     PrintXmmRegisters(ctx);
+    PrintYmmRegisters(ctx);
 }
 
 const uintptr_t AsmRepl::Read()
