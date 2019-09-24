@@ -1,5 +1,7 @@
 #include <asmtk/asmtk.h>
 
+#include <Windows.h>
+
 #include <iostream>
 #include <string>
 
@@ -23,6 +25,10 @@ class AsmRepl
     bool print_debug_;
     bool print_xmm_;
 
+    void PrintXmmRegisters(const CONTEXT*);
+    void PrintDebugRegisters(const CONTEXT*);
+    void PrintEFlags(const CONTEXT*);
+    void PrintSegmentRegisters(const CONTEXT*);
     void InitAsmjit();
     void InitRuntime();
 public:
@@ -108,23 +114,65 @@ void AsmRepl::Init()
     // TODO check for errors
 }
 
+void AsmRepl::PrintXmmRegisters(const CONTEXT* ctx)
+{
+    printf("xmm0 =%016llx%016llx xmm1 =%016llx%016llx\n", ctx->Xmm0.High, ctx->Xmm0.Low, ctx->Xmm1.High, ctx->Xmm1.Low);
+    printf("xmm2 =%016llx%016llx xmm3 =%016llx%016llx\n", ctx->Xmm2.High, ctx->Xmm2.Low, ctx->Xmm3.High, ctx->Xmm3.Low);
+    printf("xmm4 =%016llx%016llx xmm5 =%016llx%016llx\n", ctx->Xmm4.High, ctx->Xmm4.Low, ctx->Xmm5.High, ctx->Xmm5.Low);
+    printf("xmm6 =%016llx%016llx xmm7 =%016llx%016llx\n", ctx->Xmm6.High, ctx->Xmm6.Low, ctx->Xmm7.High, ctx->Xmm7.Low);
+    printf("xmm8 =%016llx%016llx xmm9 =%016llx%016llx\n", ctx->Xmm8.High, ctx->Xmm8.Low, ctx->Xmm9.High, ctx->Xmm9.Low);
+    printf("xmm10=%016llx%016llx xmm11=%016llx%016llx\n", ctx->Xmm10.High, ctx->Xmm10.Low, ctx->Xmm11.High, ctx->Xmm11.Low);
+    printf("xmm12=%016llx%016llx xmm13=%016llx%016llx\n", ctx->Xmm12.High, ctx->Xmm12.Low, ctx->Xmm13.High, ctx->Xmm13.Low);
+    printf("xmm14=%016llx%016llx xmm15=%016llx%016llx\n", ctx->Xmm14.High, ctx->Xmm14.Low, ctx->Xmm15.High, ctx->Xmm15.Low);
+    printf("\nvec: %016llx%016llx\n", ctx->VectorRegister[0].High, ctx->VectorRegister[0].Low);
+}
+
+void AsmRepl::PrintDebugRegisters(const CONTEXT* ctx)
+{
+    printf("dr0=%016llx dr1=%016llx dr2=%016llx\n", ctx->Dr0, ctx->Dr1, ctx->Dr2);
+    printf("dr3=%016llx dr6=%016llx dr7=%016llx\n", ctx->Dr3, ctx->Dr6, ctx->Dr7);
+}
+
+void AsmRepl::PrintEFlags(const CONTEXT* ctx)
+{
+    DWORD flags = ctx->EFlags;
+    printf("[ CF=%d PF=%d AF=%d ZF=%d SF=%d TF=%d IF=%d DF=%d OF=%d IOPL=%d NT=%d ]\n", flags & 1,
+                                                                                        (flags >> 2) & 0x1,
+                                                                                        (flags >> 4) & 0x1,
+                                                                                        (flags >> 6) & 0x1,
+                                                                                        (flags >> 7) & 0x1,
+                                                                                        (flags >> 8) & 0x1,
+                                                                                        (flags >> 9) & 0x1,
+                                                                                        (flags >> 10) & 0x1,
+                                                                                        (flags >> 11) & 0x1,
+                                                                                        (flags >> 12) & 0x3,
+                                                                                        (flags >> 14) & 0x1);
+}
+
+void AsmRepl::PrintSegmentRegisters(const CONTEXT* ctx)
+{
+    printf("cs=%04x ds=%04x es=%04x fs=%04x gs=%04x ss=%04x\n", ctx->SegCs, ctx->SegDs, ctx->SegEs,
+                                                                ctx->SegFs, ctx->SegGs, ctx->SegSs);
+}
+
+//void AsmRepl::PrintYmmRegisters(CONTEXT* ctx)
+//{
+//    PM128A ymm = (PM128A)LocateXStateFeature(ctx, XSTATE_AVX, 0);
+//    
+//}
+
 void AsmRepl::PrintContext(const CONTEXT* ctx)
 {
-    printf("rax=%#016llx rbx=%#016llx rcx=%#016llx\n", ctx->Rax, ctx->Rbx, ctx->Rcx);
-    printf("rdx=%#016llx rsi=%#016llx rdi=%#016llx\n", ctx->Rdx, ctx->Rsi, ctx->Rdi);
-    printf("r8 =%#016llx r9 =%#016llx r10=%#016llx\n", ctx->R8, ctx->R9, ctx->R10);
-    printf("r11=%#016llx r12=%#016llx r13=%#016llx\n", ctx->R11, ctx->R12, ctx->R13);
-    printf("r14=%#016llx r15=%#016llx rbp=%#016llx\n", ctx->R14, ctx->R15, ctx->Rbp);
-    printf("rsp=%#016llx rip=%#016llx\n", ctx->Rsp, ctx->Rip);
-    if(print_debug_)
-    {
-        printf("dr0=%#016llx dr1=%#016llx dr2=%#016llx\n", ctx->Dr0, ctx->Dr1, ctx->Dr2);
-        printf("dr3=%#016llx dr6=%#016llx dr7=%#016llx\n", ctx->Dr3, ctx->Dr6, ctx->Dr7);
-    }
-    if(print_xmm_)
-    {
-        //printf("dr0=%#016llx dr1=%#016llx dr2=%#016llx\n", ctx->Xmm0, ctx->Xmm1, ctx->Xmm2);
-    }
+    printf("rax=%016llx rbx=%016llx rcx=%016llx\n", ctx->Rax, ctx->Rbx, ctx->Rcx);
+    printf("rdx=%016llx rsi=%016llx rdi=%016llx\n", ctx->Rdx, ctx->Rsi, ctx->Rdi);
+    printf("r8 =%016llx r9 =%016llx r10=%016llx\n", ctx->R8, ctx->R9, ctx->R10);
+    printf("r11=%016llx r12=%016llx r13=%016llx\n", ctx->R11, ctx->R12, ctx->R13);
+    printf("r14=%016llx r15=%016llx rbp=%016llx\n", ctx->R14, ctx->R15, ctx->Rbp);
+    printf("rsp=%016llx rip=%016llx\n", ctx->Rsp, ctx->Rip);
+    PrintEFlags(ctx);
+    PrintSegmentRegisters(ctx);
+    PrintDebugRegisters(ctx);
+    PrintXmmRegisters(ctx);
 }
 
 const uintptr_t AsmRepl::Read()
@@ -139,14 +187,14 @@ const uintptr_t AsmRepl::Read()
     while(!stop)
     {
         // Reading first input
-        std::cout << "> ";
+        std::cout << "asmrepl> ";
         std::getline(std::cin, instruction);
         // Do we want to kill quit?
         if(instruction == "quit")
         {
             // TODO
             Stop();
-            return 0;
+            stop = true;
         }
         // Process input if assembly is provided
         err = parser_->parse(instruction.c_str());
@@ -177,7 +225,6 @@ int AsmRepl::Start()
     uintptr_t current = 0;
 
     current = Read();
-    //printf("[+] Starting thread\n");
     memset(&ctx, 0, sizeof(CONTEXT));
     ctx.ContextFlags = CONTEXT_ALL;
     GetThreadContext(eval_thread_, &ctx);
