@@ -11,6 +11,10 @@ using namespace asmtk;
 // Signature of the generated function.
 typedef int (*Func)(void);
 
+#define IS_AVX(x) (x & XSTATE_AVX)
+#define IS_SSE2(x) (x & XSTATE_LEGACY_SSE)
+#define IS_AVX512(x) (x & XSTATE_AVX512_ZMM)
+
 class AsmRepl
 {
     AsmParser* parser_;
@@ -24,6 +28,7 @@ class AsmRepl
     size_t buffer_size_;
     bool print_debug_;
     bool print_xmm_;
+    uint64_t features_;
 
     void PrintXmmRegisters(const CONTEXT*);
     void PrintYmmRegisters(CONTEXT*);
@@ -32,6 +37,7 @@ class AsmRepl
     void PrintSegmentRegisters(const CONTEXT*);
     void InitAsmjit();
     void InitRuntime();
+    void ProcessCommand(std::string&);
 public:
     explicit AsmRepl();
     ~AsmRepl();
@@ -73,6 +79,7 @@ AsmRepl::AsmRepl()
     tid_ = 0;
     print_debug_ = false;
     print_xmm_ = false;
+    features_ = 0;
 }
 
 void AsmRepl::InitAsmjit()
@@ -90,12 +97,12 @@ void AsmRepl::InitRuntime()
     code_size_ = 0;
     // Allocating RWX memory
     base_address_ = (uint8_t*)VirtualAlloc(NULL, buffer_size_, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-    current_address_ = base_address_;
     if(base_address_ == nullptr)
     {
         printf("Error allocating base_address: %x\n", GetLastError());
         return;
     }
+    current_address_ = base_address_;
     memset(base_address_, 0, buffer_size_);
     // Starting suspended thread
     eval_thread_ = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)base_address_, NULL, CREATE_SUSPENDED, &tid_);
@@ -112,6 +119,7 @@ void AsmRepl::Init()
 {
     InitAsmjit();
     InitRuntime();
+    features_ = GetEnabledXStateFeatures();
     // TODO check for errors
 }
 
@@ -136,7 +144,7 @@ void AsmRepl::PrintDebugRegisters(const CONTEXT* ctx)
 void AsmRepl::PrintEFlags(const CONTEXT* ctx)
 {
     DWORD flags = ctx->EFlags;
-    printf("[ CF=%d PF=%d AF=%d ZF=%d SF=%d TF=%d IF=%d DF=%d OF=%d IOPL=%d NT=%d ]\n", flags & 1,
+    printf("[ CF=%x PF=%x AF=%x ZF=%x SF=%x TF=%x IF=%x DF=%x OF=%x IOPL=%x NT=%x ]\n", flags & 1,
                                                                                         (flags >> 2) & 0x1,
                                                                                         (flags >> 4) & 0x1,
                                                                                         (flags >> 6) & 0x1,
@@ -184,6 +192,11 @@ void AsmRepl::PrintContext(CONTEXT* ctx)
     PrintYmmRegisters(ctx);
 }
 
+void AsmRepl::ProcessCommand(std::string& input)
+{
+    // TODO
+}
+
 const uintptr_t AsmRepl::Read()
 {
     bool stop = false;
@@ -199,11 +212,23 @@ const uintptr_t AsmRepl::Read()
         std::cout << "asmrepl> ";
         std::getline(std::cin, instruction);
         // Do we want to kill quit?
-        if(instruction == "quit")
+        if(instruction[0] == '!')
         {
-            // TODO
-            Stop();
-            stop = true;
+            if(instruction == "!quit")
+            {
+                // TODO
+                Stop();
+                stop = true;
+            }
+            else if(instruction == "!ymm")
+            {
+                
+            }
+            else if(instruction == "!xmm")
+            {
+
+            }
+            continue;
         }
         // Process input if assembly is provided
         err = parser_->parse(instruction.c_str());
