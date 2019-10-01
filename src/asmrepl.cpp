@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 using namespace asmjit;
 using namespace asmtk;
@@ -29,7 +30,9 @@ class AsmRepl
     bool print_debug_;
     bool print_xmm_;
     uint64_t features_;
+    CONTEXT* state_;
 
+    void PrintGeneralPurposeRegisters(const CONTEXT*);
     void PrintXmmRegisters(const CONTEXT*);
     void PrintYmmRegisters(CONTEXT*);
     void PrintDebugRegisters(const CONTEXT*);
@@ -37,12 +40,11 @@ class AsmRepl
     void PrintSegmentRegisters(const CONTEXT*);
     void InitAsmjit();
     void InitRuntime();
-    void ProcessCommand(std::string&);
 public:
     explicit AsmRepl();
     ~AsmRepl();
     void Init();
-    const uintptr_t Read();
+    const uintptr_t Read(CONTEXT*);
     int Start();
     void Stop();
     void Wait();
@@ -59,7 +61,7 @@ long ExceptionHandler(EXCEPTION_POINTERS* ex)
     {
         // Logic here
         asmrepl->PrintContext(ex->ContextRecord);
-        current = asmrepl->Read();
+        current = asmrepl->Read(ex->ContextRecord);
         ex->ContextRecord->Dr0 = (DWORD64)current;
         ex->ContextRecord->Dr7 |=  0x1;
         return EXCEPTION_CONTINUE_EXECUTION;
@@ -170,14 +172,15 @@ void AsmRepl::PrintYmmRegisters(CONTEXT* ctx)
     PM128A xmm = nullptr;
     ymm = (PM128A)LocateXStateFeature(ctx, XSTATE_AVX, 0);
     xmm = (PM128A)LocateXStateFeature(ctx, XSTATE_LEGACY_SSE, &length);
-    // TODO ADD CHECK
-    for(size_t i = 0; i < length / sizeof(M128A); ++i)
+    if(xmm == nullptr || ymm == nullptr)
+        return;
+    for(uint32_t i = 0; i < length / sizeof(M128A); ++i)
     {
-        printf("ymm%01d=%016llx%016llx%016llx%016llx\n", i, ymm[i].High, ymm[i].Low, xmm[i].High, xmm[i].Low);
+        printf("ymm%-2lu=%016llx%016llx%016llx%016llx\n", i, ymm[i].High, ymm[i].Low, xmm[i].High, xmm[i].Low);
     }
 }
 
-void AsmRepl::PrintContext(CONTEXT* ctx)
+void AsmRepl::PrintGeneralPurposeRegisters(const CONTEXT* ctx)
 {
     printf("rax=%016llx rbx=%016llx rcx=%016llx\n", ctx->Rax, ctx->Rbx, ctx->Rcx);
     printf("rdx=%016llx rsi=%016llx rdi=%016llx\n", ctx->Rdx, ctx->Rsi, ctx->Rdi);
@@ -185,6 +188,11 @@ void AsmRepl::PrintContext(CONTEXT* ctx)
     printf("r11=%016llx r12=%016llx r13=%016llx\n", ctx->R11, ctx->R12, ctx->R13);
     printf("r14=%016llx r15=%016llx rbp=%016llx\n", ctx->R14, ctx->R15, ctx->Rbp);
     printf("rsp=%016llx rip=%016llx\n", ctx->Rsp, ctx->Rip);
+}
+
+void AsmRepl::PrintContext(CONTEXT* ctx)
+{
+    PrintGeneralPurposeRegisters(ctx);
     PrintEFlags(ctx);
     PrintSegmentRegisters(ctx);
     PrintDebugRegisters(ctx);
@@ -192,12 +200,7 @@ void AsmRepl::PrintContext(CONTEXT* ctx)
     PrintYmmRegisters(ctx);
 }
 
-void AsmRepl::ProcessCommand(std::string& input)
-{
-    // TODO
-}
-
-const uintptr_t AsmRepl::Read()
+const uintptr_t AsmRepl::Read(CONTEXT* ctx)
 {
     bool stop = false;
     Error err;
@@ -222,11 +225,15 @@ const uintptr_t AsmRepl::Read()
             }
             else if(instruction == "!ymm")
             {
-                
+                PrintYmmRegisters(ctx);
             }
             else if(instruction == "!xmm")
             {
-
+                PrintXmmRegisters(ctx);
+            }
+            else if(instruction == "!ctx")
+            {
+                PrintContext(ctx);
             }
             continue;
         }
@@ -258,11 +265,10 @@ int AsmRepl::Start()
     CONTEXT ctx;
     uintptr_t current = 0;
 
-    current = Read();
     memset(&ctx, 0, sizeof(CONTEXT));
     ctx.ContextFlags = CONTEXT_ALL;
     GetThreadContext(eval_thread_, &ctx);
-    ctx.Dr0 = (uintptr_t)current;
+    ctx.Dr0 = (uintptr_t)base_address_;
     ctx.Dr7 |= 1;
     SetThreadContext(eval_thread_, &ctx);
     ResumeThread(eval_thread_);
