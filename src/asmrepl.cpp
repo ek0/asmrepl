@@ -30,7 +30,7 @@ class AsmRepl
     bool print_debug_;
     bool print_xmm_;
     uint64_t features_;
-    CONTEXT* state_;
+    uintptr_t last_instruction_address;
 
     void PrintGeneralPurposeRegisters(const CONTEXT*);
     void PrintXmmRegisters(const CONTEXT*);
@@ -66,6 +66,10 @@ long ExceptionHandler(EXCEPTION_POINTERS* ex)
         ex->ContextRecord->Dr7 |=  0x1;
         return EXCEPTION_CONTINUE_EXECUTION;
     }
+    if(ex->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION)
+    {
+        printf("[-] Illegal instruction\n");
+    }
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
@@ -82,6 +86,7 @@ AsmRepl::AsmRepl()
     print_debug_ = false;
     print_xmm_ = false;
     features_ = 0;
+    last_instruction_address = 0;
 }
 
 void AsmRepl::InitAsmjit()
@@ -114,7 +119,6 @@ void AsmRepl::InitRuntime()
         return;
     }
     AddVectoredExceptionHandler(1, ExceptionHandler);
-    // Set single stepping for eval thread
 }
 
 void AsmRepl::Init()
@@ -212,7 +216,7 @@ const uintptr_t AsmRepl::Read(CONTEXT* ctx)
     while(!stop)
     {
         // Reading first input
-        std::cout << "asmrepl> ";
+        std::cout << "> ";
         std::getline(std::cin, instruction);
         // Do we want to kill quit?
         if(instruction[0] == '!')
