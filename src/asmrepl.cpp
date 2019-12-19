@@ -1,10 +1,13 @@
 #include <asmtk/asmtk.h>
 
-#include <Windows.h>
-
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include <cstdint>
+#include <cstdio>
+
+#include <Windows.h>
 
 using namespace asmjit;
 using namespace asmtk;
@@ -29,6 +32,7 @@ class AsmRepl
     size_t buffer_size_;
     bool print_debug_;
     bool print_xmm_;
+    bool print_ymm_;
     uint64_t features_;
     uintptr_t last_instruction_address;
 
@@ -49,6 +53,10 @@ public:
     void Stop();
     void Wait();
     void PrintContext(CONTEXT* ctx);
+    void SetShowXmm();
+    void SetShowYmm();
+    bool IsShowXmm() const;
+    bool IsShowYmm() const;
 };
 
 AsmRepl* asmrepl = nullptr;
@@ -87,6 +95,26 @@ AsmRepl::AsmRepl()
     print_xmm_ = false;
     features_ = 0;
     last_instruction_address = 0;
+}
+
+void AsmRepl::SetShowXmm()
+{
+    print_xmm_ = true;
+}
+
+void AsmRepl::SetShowYmm()
+{
+    print_ymm_ = true;
+}
+
+bool AsmRepl::IsShowXmm() const
+{
+    return print_xmm_;
+}
+
+bool AsmRepl::IsShowYmm() const
+{
+    return print_ymm_;
 }
 
 void AsmRepl::InitAsmjit()
@@ -200,8 +228,10 @@ void AsmRepl::PrintContext(CONTEXT* ctx)
     PrintEFlags(ctx);
     PrintSegmentRegisters(ctx);
     PrintDebugRegisters(ctx);
-    PrintXmmRegisters(ctx);
-    PrintYmmRegisters(ctx);
+    if (asmrepl->IsShowXmm())
+        PrintXmmRegisters(ctx);
+    if(asmrepl->IsShowYmm())
+        PrintYmmRegisters(ctx);
 }
 
 const uintptr_t AsmRepl::Read(CONTEXT* ctx)
@@ -304,7 +334,13 @@ AsmRepl::~AsmRepl()
 
 int main(int argc, char* argv[])
 {
+    std::string args(GetCommandLineA());
+
     asmrepl = new AsmRepl();
+    if (args.find("-x") != std::string::npos)
+        asmrepl->SetShowXmm();
+    if (args.find("-y") != std::string::npos)
+        asmrepl->SetShowYmm();
     asmrepl->Init();
     asmrepl->Start();
     asmrepl->Wait();
